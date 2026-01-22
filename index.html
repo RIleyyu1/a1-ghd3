@@ -1,13 +1,263 @@
 <!DOCTYPE html>
-<div id="container"></div>
-<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-<script type="module">
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fremont Bridge Bike Counts</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Arial, sans-serif;
+        background: #f7f7f7;
+        margin: 0;
+        padding: 24px;
+        color: #222;
+      }
+      #container {
+        max-width: 1100px;
+        margin: 0 auto;
+        background: #fff;
+        padding: 16px 20px 28px;
+        border-radius: 10px;
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+      }
+      .section {
+        margin-top: 18px;
+      }
+      .section h2 {
+        font-size: 18px;
+        margin: 10px 0 8px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 0 0 16px;
+        color: #555;
+      }
+      .axis path,
+      .axis line {
+        stroke: #9aa0a6;
+        shape-rendering: crispEdges;
+      }
+      .grid line {
+        stroke: #e0e0e0;
+      }
+      .grid path {
+        stroke-width: 0;
+      }
+      .bar {
+        fill: #4c78a8;
+      }
+      .line {
+        fill: none;
+        stroke: #f58518;
+        stroke-width: 2.5px;
+      }
+      .point {
+        fill: #f58518;
+        stroke: #fff;
+        stroke-width: 1.5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="container">
+      <h1>Fremont Bridge Bicycle Counts</h1>
+      <p>Top: four required graphics primitives. Bottom: daily totals from the CSV.</p>
 
-<script>
-  console.log(d3); // test if d3 is loaded
-  // Add an SVG
-  // Add Rectangles
-  // Add Circles
-  // Add Lines
-  // Add Polygons
-</script>
+      <div class="section" id="primitives">
+        <h2>Graphics Primitives</h2>
+      </div>
+
+      <div class="section" id="daily">
+        <h2>Daily Totals (Last 30 Days)</h2>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script>
+      const primitivesSvg = d3
+        .select("#primitives")
+        .append("svg")
+        .attr("width", 900)
+        .attr("height", 180);
+
+      primitivesSvg
+        .append("rect")
+        .attr("x", 30)
+        .attr("y", 30)
+        .attr("width", 140)
+        .attr("height", 90)
+        .attr("fill", "#4c78a8");
+
+      primitivesSvg
+        .append("circle")
+        .attr("cx", 260)
+        .attr("cy", 75)
+        .attr("r", 45)
+        .attr("fill", "#f58518");
+
+      primitivesSvg
+        .append("line")
+        .attr("x1", 350)
+        .attr("y1", 30)
+        .attr("x2", 500)
+        .attr("y2", 120)
+        .attr("stroke", "#54a24b")
+        .attr("stroke-width", 6);
+
+      primitivesSvg
+        .append("polygon")
+        .attr("points", "560,30 640,120 520,120")
+        .attr("fill", "#b279a2");
+
+      const chartWidth = 1000;
+      const chartHeight = 520;
+      const margin = { top: 40, right: 30, bottom: 80, left: 70 };
+      const innerWidth = chartWidth - margin.left - margin.right;
+      const innerHeight = chartHeight - margin.top - margin.bottom;
+
+      const dailySvg = d3
+        .select("#daily")
+        .append("svg")
+        .attr("width", chartWidth)
+        .attr("height", chartHeight);
+
+      const chart = dailySvg
+        .append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+      const parseDateTime = d3.timeParse("%m/%d/%Y %I:%M:%S %p");
+
+      d3.csv("Fremont_Bridge_Bicycle_Counter_20260122.csv", (d) => {
+        const total = +d["Fremont Bridge Sidewalks, south of N 34th St Total"];
+        const dateTime = parseDateTime(d.Date);
+        if (!dateTime || Number.isNaN(total)) {
+          return null;
+        }
+        return {
+          dateTime,
+          day: d3.timeDay(dateTime),
+          total,
+        };
+      })
+        .then((rows) => {
+          const totalsByDay = d3.rollup(
+            rows,
+            (v) => d3.sum(v, (d) => d.total),
+            (d) => d.day
+          );
+
+          const daily = Array.from(totalsByDay, ([day, total]) => ({
+            day,
+            total,
+          }))
+            .sort((a, b) => d3.ascending(a.day, b.day))
+            .slice(-30);
+
+          const maxDay = d3.max(daily, (d) => d.total);
+          const maxDatum = daily.find((d) => d.total === maxDay);
+
+          const x = d3
+            .scaleBand()
+            .domain(daily.map((d) => d.day))
+            .range([0, innerWidth])
+            .padding(0.2);
+
+          const y = d3
+            .scaleLinear()
+            .domain([0, d3.max(daily, (d) => d.total) * 1.1])
+            .nice()
+            .range([innerHeight, 0]);
+
+          const yGrid = d3
+            .axisLeft(y)
+            .ticks(6)
+            .tickSize(-innerWidth)
+            .tickFormat("");
+
+          chart.append("g").attr("class", "grid").call(yGrid);
+
+          chart
+            .selectAll(".bar")
+            .data(daily)
+            .enter()
+            .append("rect")
+            .attr("class", "bar")
+            .attr("x", (d) => x(d.day))
+            .attr("y", (d) => y(d.total))
+            .attr("width", x.bandwidth())
+            .attr("height", (d) => innerHeight - y(d.total));
+
+          const line = d3
+            .line()
+            .x((d) => x(d.day) + x.bandwidth() / 2)
+            .y((d) => y(d.total));
+
+          chart.append("path").datum(daily).attr("class", "line").attr("d", line);
+
+          chart
+            .selectAll(".point")
+            .data(daily)
+            .enter()
+            .append("circle")
+            .attr("class", "point")
+            .attr("cx", (d) => x(d.day) + x.bandwidth() / 2)
+            .attr("cy", (d) => y(d.total))
+            .attr("r", (d) => (d === maxDatum ? 6 : 3.5));
+
+          const xAxis = d3
+            .axisBottom(x)
+            .tickValues(daily.filter((_, i) => i % 5 === 0).map((d) => d.day))
+            .tickFormat(d3.timeFormat("%b %d"));
+
+          chart
+            .append("g")
+            .attr("class", "axis")
+            .attr("transform", `translate(0,${innerHeight})`)
+            .call(xAxis)
+            .selectAll("text")
+            .attr("transform", "rotate(-35)")
+            .style("text-anchor", "end");
+
+          chart.append("g").attr("class", "axis").call(d3.axisLeft(y));
+
+          const highlight = chart
+            .append("g")
+            .attr(
+              "transform",
+              `translate(${x(maxDatum.day) + x.bandwidth() / 2},${y(maxDatum.total) - 18})`
+            );
+
+          highlight
+            .append("polygon")
+            .attr("points", "0,0 12,0 6,-12")
+            .attr("fill", "#54a24b");
+
+          highlight
+            .append("text")
+            .attr("x", 18)
+            .attr("y", -6)
+            .attr("fill", "#333")
+            .attr("font-size", "12px")
+            .text(`Peak: ${d3.format(",")(maxDatum.total)}`);
+
+          dailySvg
+            .append("text")
+            .attr("x", margin.left)
+            .attr("y", 20)
+            .attr("font-size", "13px")
+            .attr("fill", "#666")
+            .text("Bars show daily totals; line + points show trend.");
+        })
+        .catch((error) => {
+          console.error("Failed to load CSV:", error);
+          d3.select("#daily")
+            .append("p")
+            .style("color", "#c0392b")
+            .text(
+              "CSV load failed. If you opened this file directly, please use a local server and reload."
+            );
+        });
+    </script>
+  </body>
+</html>
