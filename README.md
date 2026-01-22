@@ -31,7 +31,7 @@ Screenshots
 - `ScreenShot.png`
 ---
 
-`https://YOUR_GITHUB_USERNAME.github.io/01-ghd3/index.html`
+`https://rileyyu1.github.io/a1-ghd3/`
 
 
 
