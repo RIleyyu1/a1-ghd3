@@ -30,8 +30,8 @@ Screenshots
 
 - `ScreenShot.png`
 ---
-
-`https://RIleyyu1.github.io/01-ghd3/index.html`
+Demo link
+`https://rileyyu1.github.io/a1-ghd3/`
 
 
 
